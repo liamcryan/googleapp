@@ -1,0 +1,286 @@
+import os
+
+import imaplib
+import smtplib
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+import time
+from selenium import webdriver
+from selenium.webdriver import ActionChains
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException
+
+from simplgmail.errors import InvalidInput
+
+
+class GmailSMTP:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+        self.smtp = smtplib.SMTP('smtp.gmail.com:587')
+        self.smtp.ehlo()
+        self.smtp.starttls()
+        self.smtp.login(username, password)
+
+    def tear_down(self):
+        self.smtp.quit()
+        self.smtp = None
+
+    def send(self, sender, receiver, message, subject=None, file_name=None):
+        """
+
+        :param sender: a string email address like "liam@data-handyman.com"
+        :param receiver: a string email address or a list of string email addresses
+        :param message: a string
+        :param subject: a string, not required
+        :param file_name: a text file name (don't think it could open other files but not sure yet)
+        :return:
+        """
+        msg = MIMEMultipart()
+        msg["From"] = sender
+        msg["To"] = receiver
+        msg["Subject"] = subject if subject else "Email Headed Your Way"
+        msg.attach(MIMEText(message, "plain"))
+
+        text = msg.as_string()
+
+        if file_name:
+            attachment = open(file_name, "rb")
+
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", "attachment; filename={}".format(file_name))
+
+            msg.attach(part)
+
+        self.smtp.sendmail(from_addr=sender, to_addrs=receiver, msg=text)
+
+
+class GmailIMAP:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+        self.imap = imaplib.IMAP4_SSL("imap.gmail.com")
+        self.imap.login(username, password)
+
+    def tear_down(self):
+        self.imap.close()
+        self.imap.logout()
+        self.imap = None
+
+    def set(self, label):
+        r, d = self.imap.select(label)
+        if r == "NO":
+            raise Exception(d)
+
+    def search(self, subject="ALL"):
+        if subject == "ALL":
+            r, d = self.imap.uid("search", None, subject)
+        else:
+            r, d = self.imap.uid("search", None, '(HEADER Subject {})'.format(subject))
+        if r == "OK":
+            return d.split()[-1]
+
+    def fetch(self, _id):
+        if not isinstance(_id, bytes):
+            _id = str.encode(_id)
+        r, d = self.imap.uid("fetch", _id, "(RFC822)")
+        if r == "OK":
+            return d
+        raise Exception(d)
+
+    def delete(self, _id):
+        if not isinstance(_id, bytes):
+            _id = str.encode(_id)
+        self.imap.uid("store", _id, "+FLAGS", "\\Deleted")
+        self.imap.expunge()
+
+
+class SimplGmailRequirements:
+    def __init__(self, username, password, phone_number=None, app_name=None):
+        here = os.path.abspath(os.path.dirname(__file__))
+        chrome_options = Options()
+        # chrome_options.add_argument("--headless")
+        self.driver = webdriver.Chrome(executable_path=os.path.join(here, "drivers", "chromedriver"),
+                                       chrome_options=chrome_options)
+        self.auth_enabled = None
+        self.signed_in = False
+        self.app_password = None
+        self.username = username
+        self.password = password
+        self.phone_number = phone_number
+        self.app_name = app_name
+
+    def tear_down(self):
+        self.driver.quit()  # self.driver.close() closes the currently open tab
+        self.auth_enabled = False
+        self.signed_in = False
+        self.app_password = None
+
+    @staticmethod
+    def _receive_code():
+        return input("please enter the verification code  --> ")
+
+    def _check_valid_input(self):
+        try:  # aria-invalid='true'
+            WebDriverWait(self.driver, 2).until(EC.presence_of_element_located(
+                (By.XPATH, "//input[@aria-invalid='true']")))
+            raise InvalidInput
+        except TimeoutException:
+            return
+
+    def _username(self):
+        username = self.driver.find_element_by_id("identifierId")
+        username.clear()
+        username.send_keys(self.username)
+        go_to_next = self.driver.find_element_by_id("identifierNext")
+        go_to_next.click()
+
+        self._check_valid_input()
+
+    def _password(self):
+        password = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable(
+            (By.XPATH, "//input[@name='password']")))
+        password.clear()
+        password.send_keys(self.password)
+        go_to_next = self.driver.find_element_by_id("passwordNext")
+        go_to_next.click()
+
+        self._check_valid_input()
+
+    def _phone_code(self):
+        try:
+            phone_code = WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable((By.ID, "idvPin")))
+        except TimeoutException:
+            self.auth_enabled = False
+            return None
+        phone_code.clear()
+        phone_code.send_keys(self._receive_code())
+        go_to_next = self.driver.find_element_by_id("idvPreregisteredPhoneNext")
+        go_to_next.click()
+        self.auth_enabled = True  # this must be true because you are inputting a phone code
+        self._check_valid_input()
+
+    def sign_in(self):
+        self.driver.get(
+            "https://accounts.google.com/"
+            "signin/v2/identifier?hl=en&passive=true&continue="
+            "https%3A%2F%2Fwww.google.com%2F&flowName=GlifWebSignIn&flowEntry=ServiceLogin")
+        if "v2" not in self.driver.current_url:
+            raise Exception("Can only authenticate v2 of Google's sign in page")
+        self._username()
+        self._password()
+        self._phone_code()  # what about the case where the user just needs to tap the phone?
+        # self._google_prompt()  # this is the case where the user uses the google prompt instead of receiving codes...
+        self.signed_in = True
+
+    def _turn_off_auth(self):
+        turn_off = self.driver.find_element_by_xpath("//span[contains(text(), 'Turn off')]")
+        turn_off.click()
+        turn_off_popup = self.driver.find_elements_by_xpath("//span[contains(text(), 'Turn off')]")[2]
+        turn_off_popup.click()
+        self.auth_enabled = False
+
+    def disable_two_step_verification(self):
+        if not self.signed_in:
+            self.sign_in()
+            return self.disable_two_step_verification()
+        if self.auth_enabled is False:
+            return None
+        self.driver.get("https://myaccount.google.com/signinoptions/two-step-verification")
+        self._password()
+        self._turn_off_auth()
+
+    def _enter_number(self):
+        try:
+            phone_number = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.TAG_NAME, "input")))
+        except TimeoutException:
+            return None  # this is the case where the phone number is already saved...
+        time.sleep(3)  # for errors due to my slow computer?
+        phone_number.clear()
+        phone_number.send_keys(self.phone_number)
+        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        go_to_next = self.driver.find_element_by_xpath("//span[contains(text(), 'Next')]")
+        go_to_next.click()
+        self._check_valid_input()
+
+    def _confirm_phone(self):
+        try:
+            confirm_phone = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.TAG_NAME, "input")))
+        except TimeoutException:  # this is the case where the phone number is already saved
+            return None
+        confirm_phone.send_keys(self._receive_code())
+        go_to_next = self.driver.find_element_by_xpath("//span[contains(text(), 'Next')]")
+        go_to_next.click()
+        self._check_valid_input()
+
+    def _turn_on_auth(self):
+        turn_on = WebDriverWait(self.driver, 2).until(EC.presence_of_element_located(
+            (By.XPATH, "//span[contains(text(), 'Turn on')]")))
+        turn_on.click()
+        self.auth_enabled = True
+
+    def enable_two_step_verification(self):
+        if not self.signed_in:
+            self.sign_in()
+            return self.enable_two_step_verification()
+        if self.auth_enabled:
+            return None
+        self.driver.get("https://myaccount.google.com/signinoptions/two-step-verification/enroll-welcome")
+        self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        get_started = self.driver.find_element_by_xpath("//span[contains(text(), 'Get started')]")
+        get_started.click()
+        self._password()
+        self._enter_number()
+        self._confirm_phone()
+        self._turn_on_auth()
+
+    def generate_app_password(self):
+        if not self.signed_in:
+            self.sign_in()
+            return self.generate_app_password()
+        if not self.auth_enabled:
+            self.enable_two_step_verification()
+            return self.generate_app_password()
+
+        self.driver.get("https://myaccount.google.com/apppasswords")  # it's like this gets skipped over...
+
+        self._password()
+        self._phone_code()
+
+        # none of this works...need to figure out how to click on menu and select item i want...
+        select_app = self.driver.find_element_by_xpath("//content[contains(text(), 'Select app')]")
+        select_app.click()
+        mail_option = self.driver.find_element_by_xpath("//content[contains(text(), 'Mail')]")
+        ActionChains(self.driver).move_to_element(mail_option).click()
+
+        select_device = self.driver.find_element_by_xpath("//content[contains(text(), 'Select device')]")
+        select_device.click()
+        other = self.driver.find_element_by_xpath("//content[contains(text(), 'Other')]")
+        ActionChains(self.driver).move_to_element(other).click()
+
+        other_device = self.driver.find_elements_by_tag_name("input")
+        other_device.clear()
+        other_device.send_keys("My Custom Device")
+
+        generate = self.driver.find_element_by_xpath("//content[contains(text(), 'Generate')]")
+        generate.click()
+
+        # after you generate you'll need to get the app password
+
+    def remove_app_password(self):
+        if not self.signed_in:
+            self.sign_in()
+            return self.remove_app_password()
+        self.driver.get("https://myaccount.google.com/apppasswords")
+
+        self.password()
+
+        # # will need to figure this out...

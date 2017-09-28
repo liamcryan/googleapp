@@ -1,0 +1,7 @@
+.idea
+.cache
+.coverage
+.tox
+rever.egg-info
+dist
+__pycache__

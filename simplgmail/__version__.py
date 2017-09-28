@@ -1,0 +1,7 @@
+__title__ = "simplgmail"
+__author__ = "Liam Cryan"
+__author_email__ = "data.handyman.01@gmail.com"
+__version__ = "0.1.1"
+__description__ = "simple way to send or search for gmails via python"
+__license__ = "MIT"
+__url__ = "http://github.com/liamcryan/simplgmail"
