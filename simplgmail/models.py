@@ -9,7 +9,6 @@ from email.mime.text import MIMEText
 
 import time
 from selenium import webdriver
-from selenium.webdriver import ActionChains
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -39,7 +38,7 @@ class GmailSMTP:
         :param receiver: a string email address or a list of string email addresses
         :param message: a string
         :param subject: a string, not required
-        :param file_name: a text file name (don't think it could open other files but not sure yet)
+        :param file_name: a text file name (don't know if it could open other files...haven't tested)
         :return:
         """
         msg = MIMEMultipart()
@@ -103,11 +102,11 @@ class GmailIMAP:
         self.imap.expunge()
 
 
-class SimplGmailRequirements:
+class GmailRequirements:
     def __init__(self, username, password, phone_number=None, app_name=None):
         here = os.path.abspath(os.path.dirname(__file__))
         chrome_options = Options()
-        # chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless")
         self.driver = webdriver.Chrome(executable_path=os.path.join(here, "drivers", "chromedriver"),
                                        chrome_options=chrome_options)
         self.auth_enabled = None
@@ -178,7 +177,6 @@ class SimplGmailRequirements:
         self._username()
         self._password()
         self._phone_code()  # what about the case where the user just needs to tap the phone?
-        # self._google_prompt()  # this is the case where the user uses the google prompt instead of receiving codes...
         self.signed_in = True
 
     def _turn_off_auth(self):
@@ -191,7 +189,6 @@ class SimplGmailRequirements:
     def disable_two_step_verification(self):
         if not self.signed_in:
             self.sign_in()
-            return self.disable_two_step_verification()
         if self.auth_enabled is False:
             return None
         self.driver.get("https://myaccount.google.com/signinoptions/two-step-verification")
@@ -203,7 +200,6 @@ class SimplGmailRequirements:
             phone_number = WebDriverWait(self.driver, 2).until(EC.element_to_be_clickable((By.TAG_NAME, "input")))
         except TimeoutException:
             return None  # this is the case where the phone number is already saved...
-        time.sleep(3)  # for errors due to my slow computer?
         phone_number.clear()
         phone_number.send_keys(self.phone_number)
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -230,7 +226,6 @@ class SimplGmailRequirements:
     def enable_two_step_verification(self):
         if not self.signed_in:
             self.sign_in()
-            return self.enable_two_step_verification()
         if self.auth_enabled:
             return None
         self.driver.get("https://myaccount.google.com/signinoptions/two-step-verification/enroll-welcome")
@@ -242,45 +237,69 @@ class SimplGmailRequirements:
         self._confirm_phone()
         self._turn_on_auth()
 
-    def generate_app_password(self):
-        if not self.signed_in:
-            self.sign_in()
-            return self.generate_app_password()
-        if not self.auth_enabled:
-            self.enable_two_step_verification()
-            return self.generate_app_password()
-
-        self.driver.get("https://myaccount.google.com/apppasswords")  # it's like this gets skipped over...
-
+    def _app_password_enter_info(self):
         self._password()
-        self._phone_code()
+        # self._phone_code()  # not sure if i need this
 
         # none of this works...need to figure out how to click on menu and select item i want...
         select_app = self.driver.find_element_by_xpath("//content[contains(text(), 'Select app')]")
         select_app.click()
-        mail_option = self.driver.find_element_by_xpath("//content[contains(text(), 'Mail')]")
-        ActionChains(self.driver).move_to_element(mail_option).click()
+        # WebDriverWait(self.driver, 2).until(EC.presence_of_all_elements_located(
+        # (By.XPATH, "//div[@aria-label='Mail'")))
+        # mail_option = self.driver.find_elements_by_xpath("//div[@aria-label='Mail'")[2]
+        # mail_option.click()
+        time.sleep(2)
+        self.driver.execute_script('document.querySelectorAll(\'[aria-label="Mail"]\')[1].click()')
 
         select_device = self.driver.find_element_by_xpath("//content[contains(text(), 'Select device')]")
         select_device.click()
-        other = self.driver.find_element_by_xpath("//content[contains(text(), 'Other')]")
-        ActionChains(self.driver).move_to_element(other).click()
+        # WebDriverWait(self.driver, 2).until(EC.presence_of_all_elements_located(
+        #     (By.XPATH, "//div[@aria-label='Other (Custom name)'")))
+        # other_custom_name = self.driver.find_elements_by_xpath("//div[@aria-label='Other (Custom name)'")[3]
+        # other_custom_name.click()
+        time.sleep(2)
+        self.driver.execute_script('document.querySelectorAll(\'[aria-label="Other (Custom name)"]\')[2].click()')
 
-        other_device = self.driver.find_elements_by_tag_name("input")
-        other_device.clear()
-        other_device.send_keys("My Custom Device")
+        WebDriverWait(self.driver, 2).until(EC.presence_of_element_located((By.TAG_NAME, "input")))
+        other_input = self.driver.find_element_by_tag_name("input")
+        other_input.clear()
+        other_input.send_keys(self.app_name)
 
-        generate = self.driver.find_element_by_xpath("//content[contains(text(), 'Generate')]")
+        generate = self.driver.find_element_by_xpath("//span[contains(text(), 'Generate')]")
         generate.click()
 
-        # after you generate you'll need to get the app password
+        WebDriverWait(self.driver, 2).until(EC.presence_of_element_located(
+            (By.XPATH, "//div[contains(text(), 'Your app password for your device')]/following-sibling::div")))
+        app_password = self.driver.find_element_by_xpath(
+            "//div[contains(text(), 'Your app password for your device')]/following-sibling::div").text
+        self.app_password = app_password
+        return app_password
+
+    def generate_app_password(self):
+        if not self.signed_in:
+            self.sign_in()
+        if not self.auth_enabled:
+            self.enable_two_step_verification()
+
+        self.driver.get("https://myaccount.google.com/apppasswords")  # it's like this gets skipped over...
+
+        self._app_password_enter_info()  # may need to retry this if there is an error
+
+    def _app_password_remove_info(self):
+        self._password()
+        try:
+            WebDriverWait(self.driver, 2).until(EC.presence_of_element_located(
+                (By.XPATH, "//div[@data-name='{}']/div[2]/div")))
+        except TimeoutException:
+            self.app_password = None
+            return None
+        trash_app_name = self.driver.find_element_by_xpath(
+            "//div[@data-name='{}']/div[2]/div".format(self.app_name))
+        trash_app_name.click()
+        self.app_password = None
 
     def remove_app_password(self):
         if not self.signed_in:
             self.sign_in()
-            return self.remove_app_password()
         self.driver.get("https://myaccount.google.com/apppasswords")
-
-        self.password()
-
-        # # will need to figure this out...
+        self._app_password_remove_info()

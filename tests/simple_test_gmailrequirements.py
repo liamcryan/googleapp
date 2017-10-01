@@ -1,7 +1,7 @@
 import os
 from io import open
 
-from simplgmail import SimplGmailRequirements
+from simplgmail import GmailRequirements
 
 here = os.path.abspath(os.path.dirname(__file__))
 credentials = {}
@@ -14,6 +14,14 @@ password = credentials["password"]
 phone_number = credentials["phone_number"]
 app_name = credentials["app_name"]
 
-g = SimplGmailRequirements(username, password, phone_number, app_name)
+g = GmailRequirements(username, password, phone_number, app_name)
+
+g.disable_two_step_verification()
+
+g.enable_two_step_verification()
+
 g.generate_app_password()
-print("stop")
+
+
+g.remove_app_password()
+

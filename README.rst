@@ -2,76 +2,15 @@
 simplgmail
 ----------
 
-Requirements
-------------
-
-1.  Enable 2-Step Authentication
-
-2.  Generate an App Password
-
-You also must have a google account :)
-
-Automatic
----------
-
-*This process uses selenium & chromedriver, so I think you need to have chrome installed*
-
-Into command prompt type:
-
-$ pip install simplgmail
-
-Into Python type:
+Want to use Python to interact with Gmail?  Cool.  You now need to enable 2-step authentication or
+allow "less secure apps" within Google.  But not manually, just do this:
 
 >>> import simplgmail
->>> my_app_password = simplgmail.app_password("your_gmail_username", "your_gmail_password", "your_phone_number")
+>>> app_pass = simplgmail.generate_app_pass(username, password, phone_number, app_name)
 
-*Note: you will be prompted mid-execution on the command prompt for phone verification codes!*
+You'll receive a verification code on your phone.  When you are prompted, make sure to type in the code.
 
-Manual
-------
-
-If you don't want to try the automatic method or it isn't working, you can try the manual method.  If the
-automatic method worked for you, then skip this section.
-
-- Go here and follow directions for enabling 2 step authentication:
-
-    - https://support.google.com/accounts/answer/185839?hl=en
-
-- Then go to the link below and follow directions for generating an app password:
-
-    - https://support.google.com/accounts/answer/185833?hl=en
-
-
-Did it work?
-------------
-
-After that you can make sure everything worked by typing into Python:
-
->>> import smtplib
->>> s = smtplib.SMTP('smtp.gmail.com:587')
->>> s.ehlo()
->>> s.starttls()
->>> s.login(username, app_password)
-
-*Note: make sure to use the app password you just generated when you login!*
-
-You should see something that looks like this if it worked:
-
->>> (235, b'2.7.0 Accepted')
-
-The next thing to check is this:
-
->>>  import imaplib
->>> m = imaplib.IMAP4_SSL("imap.gmail.com")
->>> m.login(username, app_password)
-
-You should see something that looks like this:
-
->>> ('OK', [b'{} authenticated (Success)'.format(username)])
-
-Now you are ready!  Be sure to remember that if you want to run your program on another computer,
-you will need to generate another app password.
-
+Now, you're ready to interact with Gmail!
 
 Usage
 -----
@@ -90,4 +29,7 @@ Usage
 Testing
 -------
 
-Not very far here, but coming.
+I'm not sure how to run a test suite for SimplGmailRequirements (automatically generating the app password) because
+I can't enter terminal input mid execution.
+
+Haven't tested GmailSMTP or GmailIMAP
