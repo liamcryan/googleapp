@@ -46,3 +46,13 @@ Installation
 ------------
 
 Not very confident with this yet, so only installation is through this github repo.
+
+
+Next/To Do
+----------
+
+Take out some of the imap and smtp stuff, it is not helpful and probably doesn't work
+
+Rename this project something like python-gmail-setup
+
+Make sure that this can handle google console, not only entering phone number for 2 factor auth
