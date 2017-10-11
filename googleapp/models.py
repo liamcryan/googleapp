@@ -1,12 +1,5 @@
 import os
 
-import imaplib
-import smtplib
-from email import encoders
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-
 import time
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
@@ -15,94 +8,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException
 
-from simplgmail.errors import InvalidInput
+from googleapp.errors import InvalidInput
 
 
-class GmailSMTP:
-    def __init__(self, username, password):
-        self.username = username
-        self.password = password
-        self.smtp = smtplib.SMTP('smtp.gmail.com:587')
-        self.smtp.ehlo()
-        self.smtp.starttls()
-        self.smtp.login(username, password)
-
-    def tear_down(self):
-        self.smtp.quit()
-        self.smtp = None
-
-    def send(self, sender, receiver, message, subject=None, file_name=None):
-        """
-
-        :param sender: a string email address like "liam@data-handyman.com"
-        :param receiver: a string email address or a list of string email addresses
-        :param message: a string
-        :param subject: a string, not required
-        :param file_name: a text file name (don't know if it could open other files...haven't tested)
-        :return:
-        """
-        msg = MIMEMultipart()
-        msg["From"] = sender
-        msg["To"] = receiver
-        msg["Subject"] = subject if subject else "Email Headed Your Way"
-        msg.attach(MIMEText(message, "plain"))
-
-        text = msg.as_string()
-
-        if file_name:
-            attachment = open(file_name, "rb")
-
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(attachment.read())
-            encoders.encode_base64(part)
-            part.add_header("Content-Disposition", "attachment; filename={}".format(file_name))
-
-            msg.attach(part)
-
-        self.smtp.sendmail(from_addr=sender, to_addrs=receiver, msg=text)
-
-
-class GmailIMAP:
-    def __init__(self, username, password):
-        self.username = username
-        self.password = password
-        self.imap = imaplib.IMAP4_SSL("imap.gmail.com")
-        self.imap.login(username, password)
-
-    def tear_down(self):
-        self.imap.close()
-        self.imap.logout()
-        self.imap = None
-
-    def set(self, label):
-        r, d = self.imap.select(label)
-        if r == "NO":
-            raise Exception(d)
-
-    def search(self, subject="ALL"):
-        if subject == "ALL":
-            r, d = self.imap.uid("search", None, subject)
-        else:
-            r, d = self.imap.uid("search", None, '(HEADER Subject {})'.format(subject))
-        if r == "OK":
-            return d.split()[-1]
-
-    def fetch(self, _id):
-        if not isinstance(_id, bytes):
-            _id = str.encode(_id)
-        r, d = self.imap.uid("fetch", _id, "(RFC822)")
-        if r == "OK":
-            return d
-        raise Exception(d)
-
-    def delete(self, _id):
-        if not isinstance(_id, bytes):
-            _id = str.encode(_id)
-        self.imap.uid("store", _id, "+FLAGS", "\\Deleted")
-        self.imap.expunge()
-
-
-class GmailRequirements:
+class GoogleApp:
     def __init__(self, username, password, phone_number=None, app_name=None):
         here = os.path.abspath(os.path.dirname(__file__))
         chrome_options = Options()

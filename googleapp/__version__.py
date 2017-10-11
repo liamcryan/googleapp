@@ -1,0 +1,7 @@
+__title__ = "googleapp"
+__author__ = "Liam Cryan"
+__author_email__ = "data.handyman.01@gmail.com"
+__version__ = "0.2.1"
+__description__ = "generate/remove a google app password, enable/disable google's 2 step authentication"
+__license__ = "MIT"
+__url__ = "http://github.com/liamcryan/googleapp"

@@ -1,58 +1,51 @@
-----------
-simplgmail
-----------
+---------
+googleapp
+---------
 
-Want to use Python to interact with Gmail?  Cool.  You now need to enable 2-step authentication or
-allow "less secure apps" within Google.  But not manually, just do this:
-
->>> import simplgmail
->>> app_pass = simplgmail.generate_app_pass(username, password, phone_number, app_name)
-
-You'll receive a verification code on your phone.  When you are prompted, make sure to type in the code.
-
-Now, you're ready to interact with Gmail!  P.S.  I hope the above command worked for you!  Make sure to save the app
-password, because you will need it below.  If you forget to save the app password, just do:
-
->>> simplgmail.remove_app_pass(username, password, phone_number, app_name)
-
-Then run (and make sure to save it this time):
-
->>> app_pass = simplgmail.generate_app_pass(username, password, phone_number, app_name)
+Want to create a Google App Password?  Or enable Google's 2-Step Authentication?
+You've come to the right place.  This library uses Selenium to automate browser interaction, but you
+don't see it thanks to chrome headless.
 
 
-Usage
------
+Generate Google App Password
+----------------------------
 
->>> import simplgmail
->>>
->>> s = simplgmail.smtp(username, app_password)
->>> s.send(sender, receiver, message)  # this should send your email to receiver(s)
->>>
->>> m = simplgmail.imap(username, app_password)
->>> m.set("INBOX")
->>> _id = m.search(subject="Daily Adventures")
->>> email = m.fetch(_id)  # email should now contain the content of the email associated with _id
+>>> import googleapp
+>>> app_pass = googleapp.generate_app_pass(username, password, phone_number, app_name)
 
+You'll receive a verification code on your phone.  When you are prompted , make sure to type the code in
+the terminal.
 
-Testing
--------
+Remove a Google App Password
+----------------------------
 
-I'm not sure how to run a test suite for SimplGmailRequirements (automatically generating the app password) because
-I can't enter terminal input mid execution.
-
-Haven't tested GmailSMTP or GmailIMAP
-
-Installation
-------------
-
-Not very confident with this yet, so only installation is through this github repo.
+>>> googleapp.remove_app_pass(username, password, phone_number, app_name)
 
 
-Next/To Do
-----------
+Enable Google's 2 Step Authentication
+-------------------------------------
 
-Take out some of the imap and smtp stuff, it is not helpful and probably doesn't work
+>>> googleapp.enable_two_step_auth(username, password, phone_number)
 
-Rename this project something like python-gmail-setup
 
-Make sure that this can handle google console, not only entering phone number for 2 factor auth
+Disable Google's 2 Step Authentication
+--------------------------------------
+
+>>> googleapp.disable_two_step_auth(username, password, phone_number)
+
+
+Problems
+--------
+
+1.  Two step authentication provides the user a couple of options to verify.  One method is to verify
+by entering a received phone code.  The other method is to verify by Google console.  This library
+will not work if you have the verify by Google Console enabled.  This is something I will work on
+soon.
+
+2.  Within the library is a /drivers/chromedriver.exe file.  This is the chromedriver executable which
+works specifically with Windows.  I plan on including the chromedriver executable for other operating
+systems and hopefully the library will be able to know which one to use.  That is also something I
+will need to work on.
+
+3.  I'm not sure how to run a test suite  because I don't think I can enter terminal input mid execution.
+Maybe I can get the phone code from a Twilio phone number?  I'll have to look into it.
