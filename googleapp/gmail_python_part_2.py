@@ -31,6 +31,7 @@ def get_formspree_email_info():
 
     imap.select("Formspree")
 
+    # big big assumption that your first email is the one you want!  may need to play with this...
     message = imap.fetch(b'1', '(RFC822)')
 
     msg = str(message[1][0][1])
