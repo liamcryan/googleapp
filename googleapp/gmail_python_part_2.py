@@ -65,6 +65,6 @@ def send_email_to_contactor(name, email, subject):
     s.sendmail(from_addr="data.handyman.01@gmail.com", to_addrs=send_to, msg=message)
 
 
-if __name__ == "__main__":
-    info_tuple = get_formspree_email_info()
-    send_email_to_contactor(*info_tuple)
+# if __name__ == "__main__":
+#     info_tuple = get_formspree_email_info()
+#     send_email_to_contactor(*info_tuple)
